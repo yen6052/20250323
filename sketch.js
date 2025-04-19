@@ -1,50 +1,86 @@
-let seaweeds = [];
-let pg;
+let circles = [];
 
 function setup() {
-  let canvas = createCanvas(windowWidth, windowHeight);
-  canvas.parent('overlay'); // 將畫布放在 overlay div 中
-  pg = createGraphics(windowWidth, windowHeight);
-  pg.clear(); // 設置透明背景
-
-  for (let j = 0; j < 40; j++) {
-    seaweeds.push({
-      x: (j + 1) * (width / 40), // 均勻分布的x位置
-      height: random(160, 320), // 線條高度隨機在160到320之間
-      width: random(30, 60), // 線條寬度隨機在30到60之間
-      color: color(random(100, 255), random(100, 255), random(100, 255), 150), // 隨機顏色，飽和度不要太高，透明度設為150
-      sway: random(150, 300), // 搖擺幅度隨機在150到300之間
-      frequency: random(0.001, 0.005) // 搖擺頻率隨機在0.001到0.005之間
+  createCanvas(windowWidth, windowHeight);
+  for (let i = 0; i < 40; i++) {
+    circles.push({
+      x: random(width),
+      y: random(height),
+      size: random(30, 50),
+      color: color(random(100, 200), 0, 0), // 暗紅色
+      speedX: random(-1, 1), // 水平移動速度
+      speedY: random(-1, 1), // 垂直移動速度
+      isScaling: false, // 是否正在縮放
+      scaleFrame: 0, // 縮放的持續幀數
+      originalSize: 0 // 記錄原始大小
     });
   }
 }
 
 function draw() {
-  pg.clear();
-  pg.noFill();
-  pg.blendMode(BLEND); // 設定混合模式為BLEND
-  
-  for (let seaweed of seaweeds) {
-    pg.strokeWeight(seaweed.width); // 使用預先生成的寬度
-    pg.stroke(seaweed.color); // 使用預先生成的顏色
-    
-    let y = height; // 底部固定點
-    let segmentLength = seaweed.height; // 使用預先生成的高度
-    
-    pg.beginShape();
-    pg.curveVertex(seaweed.x, y); // 底部固定點
-    for (let i = 0; i <= 30; i++) { // 增加節點數量
-      let factor = i / 30; // 計算節點位置的比例
-      let offsetX = noise(frameCount * seaweed.frequency + i * 0.1) * seaweed.sway * factor - seaweed.sway / 2 * factor; // 使用噪聲函數生成不規律的搖擺幅度，越靠近底部搖擺幅度越小
-      pg.curveVertex(seaweed.x + offsetX, y - i * (segmentLength / 30)); // 每個節點的位置
-    }
-    pg.endShape();
-  }
+  background('#FFECEC'); // 背景顏色改為 #FFECEC
 
-  image(pg, 0, 0, windowWidth, windowHeight);
+  let sizeOffset = map(mouseX, 0, width, 20, 80); // 根據滑鼠位置調整大小範圍為 20 到 80
+
+  for (let circle of circles) {
+    // 更新位置
+    circle.x += circle.speedX;
+    circle.y += circle.speedY;
+
+    // 邊界檢查，讓米奇圖案在畫布內反彈
+    if (circle.x - circle.size / 2 < 0 || circle.x + circle.size / 2 > width) {
+      circle.speedX *= -1; // 水平速度反向
+    }
+    if (circle.y - circle.size / 2 < 0 || circle.y + circle.size / 2 > height) {
+      circle.speedY *= -1; // 垂直速度反向
+    }
+
+    // 檢測滑鼠與米奇的距離
+    let distance = dist(mouseX, mouseY, circle.x, circle.y);
+    if (distance < circle.size) {
+      // 如果滑鼠靠近米奇，讓米奇向外彈開
+      let angle = atan2(circle.y - mouseY, circle.x - mouseX);
+      circle.speedX = cos(angle) * 3; // 彈開速度
+      circle.speedY = sin(angle) * 3;
+    }
+
+    // 處理縮放動畫
+    if (circle.isScaling) {
+      circle.scaleFrame++;
+      if (circle.scaleFrame <= 10) {
+        circle.size += 2; // 放大
+      } else if (circle.scaleFrame <= 20) {
+        circle.size -= 2; // 縮小
+      } else {
+        circle.isScaling = false; // 停止縮放
+        circle.scaleFrame = 0;
+        circle.size = circle.originalSize; // 恢復原始大小
+      }
+    }
+
+    let mainSize = circle.size + sizeOffset; // 主圓的大小隨滑鼠位置變化
+    let earSize = mainSize * 0.5; // 耳朵的大小為主圓的一半
+
+    fill(circle.color);
+    noStroke();
+
+    // 畫左耳
+    ellipse(circle.x - mainSize * 0.5, circle.y - mainSize * 0.5, earSize);
+    // 畫右耳
+    ellipse(circle.x + mainSize * 0.5, circle.y - mainSize * 0.5, earSize);
+    // 畫主圓
+    ellipse(circle.x, circle.y, mainSize);
+  }
 }
 
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  pg.resizeCanvas(windowWidth, windowHeight);
+function mousePressed() {
+  for (let circle of circles) {
+    let distance = dist(mouseX, mouseY, circle.x, circle.y);
+    if (distance < circle.size) {
+      // 如果點擊到米奇，觸發縮放動畫
+      circle.isScaling = true;
+      circle.scaleFrame = 0;
+      circle.originalSize = circle.size; // 記錄原始大小
+    }
+  }
 }
